@@ -17,12 +17,13 @@ func TestUnpack(t *testing.T) {
 		{input: "", expected: ""},
 		{input: "aaa0b", expected: "aab"},
 		{input: "d\n5abc", expected: "d\n\n\n\n\nabc"}, // символы, управляющие кареткой, работают как обычные
+		{input: `а3б2в1`, expected: `аааббв`},
 		// uncomment if task with asterisk completed
 		{input: `qwe\4\5`, expected: `qwe45`},
-		{input: `qwe\45`, expected: `qwe44444`},
+		{input: `qwe\45a`, expected: `qwe44444a`},
 		{input: `qwe\\5`, expected: `qwe\\\\\`},
 		{input: `qwe\\\3`, expected: `qwe\3`},
-		{input: `qwe\\\3`, expected: `qwe\3`},
+		{input: `q2\3`, expected: `qq3`},
 	}
 
 	for _, tc := range tests {

@@ -2,57 +2,78 @@ package hw02unpackstring
 
 import (
 	"errors"
-	"strconv"
 	"strings"
 	"unicode"
 )
 
 var ErrInvalidString = errors.New("invalid string")
 
+const (
+	idleState = iota
+	escapeState
+	runeState
+)
+
 func Unpack(input string) (string, error) {
+	state := idleState
+
 	var sb strings.Builder
+	var currentRune rune
 
-	runeInput := []rune(input)
-	escaped := false
-
-	for i, rune := range runeInput {
-		isDigitNext := (len(runeInput) > i+1) && unicode.IsDigit(runeInput[i+1])
+	for _, rune := range input {
+		isSlash := rune == '\\'
 		isDigit := unicode.IsDigit(rune)
-		isSlash := rune == 92 // '\' ~ 92
+		isLetter := !isSlash && !isDigit
 
-		if isDigit && !escaped {
-			if i == 0 || isDigitNext {
+		switch state {
+		case idleState:
+			switch {
+			case isSlash:
+				state = escapeState
+			case isDigit:
+				return "", ErrInvalidString
+			default:
+				currentRune = rune
+				state = runeState
+			}
+		case escapeState:
+			if isLetter {
 				return "", ErrInvalidString
 			}
-			continue
-		}
 
-		if isSlash && !escaped {
-			escaped = true
-			continue
-		}
-
-		if escaped && !isDigit && !isSlash {
-			return "", ErrInvalidString
-		}
-
-		if isDigit || isSlash || !escaped {
-			if isDigitNext {
-				repeatTimes, _ := strconv.Atoi(string(runeInput[i+1]))
-				repeatedRune := strings.Repeat(string(rune), repeatTimes)
-
-				sb.WriteString(repeatedRune)
-			} else {
-				sb.WriteRune(rune)
+			currentRune = rune
+			state = runeState
+		case runeState:
+			switch {
+			case isDigit:
+				write(&sb, currentRune, int(rune-'0'))
+				state = idleState
+			case isSlash:
+				write(&sb, currentRune, 1)
+				state = escapeState
+			default:
+				write(&sb, currentRune, 1)
+				currentRune = rune
 			}
 		}
-
-		escaped = false
 	}
 
-	if escaped {
+	switch state {
+	case escapeState:
 		return "", ErrInvalidString
+	case runeState:
+		write(&sb, currentRune, 1)
 	}
 
 	return sb.String(), nil
+}
+
+func write(sb *strings.Builder, symbol rune, times int) {
+	if times == 1 {
+		sb.WriteRune(symbol)
+	} else {
+		repeatedRune := strings.Repeat(string(symbol), times)
+
+		sb.WriteString(repeatedRune)
+	}
 }
