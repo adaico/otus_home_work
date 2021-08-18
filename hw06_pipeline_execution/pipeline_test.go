@@ -90,4 +90,30 @@ func TestPipeline(t *testing.T) {
 		require.Len(t, result, 0)
 		require.Less(t, int64(elapsed), int64(abortDur)+int64(fault))
 	})
+
+	t.Run("done while trying to write", func(t *testing.T) {
+		in := make(Bi)
+		done := make(Bi)
+		data := []int{1, 2, 3, 4, 5, 6}
+
+		go func() {
+			for _, v := range data {
+				in <- v
+			}
+			close(in)
+		}()
+
+		resultCh := ExecutePipeline(in, done, stages...)
+
+		// Abort after 600ms
+		abortDur := sleepPerStage * 6
+		<-time.After(abortDur)
+		close(done)
+
+		result1 := <-resultCh
+		_, ok := <-resultCh
+
+		require.Equal(t, "102", result1)
+		require.False(t, ok)
+	})
 }
