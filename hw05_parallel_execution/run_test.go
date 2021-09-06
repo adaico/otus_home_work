@@ -67,4 +67,76 @@ func TestRun(t *testing.T) {
 		require.Equal(t, runTasksCount, int32(tasksCount), "not all tasks were completed")
 		require.LessOrEqual(t, int64(elapsedTime), int64(sumTime/2), "tasks were run sequentially?")
 	})
+
+	t.Run("tasks without errors (another approach)", func(t *testing.T) {
+		tasksCount := 5 // workers count is equal
+		tasks := make([]Task, 0, tasksCount)
+
+		var runTasksCount int32
+		maxErrorsCount := 1
+		stopCh := make(chan struct{})
+		checkCh := make(chan struct{})
+		errorsCh := make(chan error, 1)
+
+		for i := 0; i < tasksCount; i++ {
+			tasks = append(tasks, func() error {
+				atomic.AddInt32(&runTasksCount, 1)
+				defer atomic.AddInt32(&runTasksCount, -1)
+
+				if int(atomic.LoadInt32(&runTasksCount)) == tasksCount {
+					checkCh <- struct{}{}
+				}
+
+				<-stopCh
+				return nil
+			})
+		}
+
+		go func() {
+			errorsCh <- Run(tasks, tasksCount, maxErrorsCount)
+		}()
+
+		select {
+		case <-time.After(time.Second):
+			require.FailNow(t, "less workers")
+		case <-checkCh:
+			require.Equal(t, tasksCount, int(atomic.LoadInt32(&runTasksCount)))
+		}
+
+		close(stopCh)
+
+		select {
+		case <-time.After(time.Second):
+			require.FailNow(t, "lazy Run")
+		case err := <-errorsCh:
+			require.NoError(t, err)
+		}
+	})
+
+	t.Run("workers count more then tasks count", func(t *testing.T) {
+		tasksCount := 2
+		tasks := make([]Task, 0, tasksCount)
+
+		var runTasksCount int32
+		var sumTime time.Duration
+
+		for i := 0; i < tasksCount; i++ {
+			taskSleep := time.Millisecond * time.Duration(rand.Intn(100))
+			sumTime += taskSleep
+
+			tasks = append(tasks, func() error {
+				time.Sleep(taskSleep)
+				atomic.AddInt32(&runTasksCount, 1)
+				return nil
+			})
+		}
+
+		workersCount := 5
+		maxErrorsCount := 1
+
+		err := Run(tasks, workersCount, maxErrorsCount)
+		require.NoError(t, err)
+
+		require.Equal(t, runTasksCount, int32(tasksCount), "not all tasks were completed")
+	})
 }
