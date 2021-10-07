@@ -19,7 +19,8 @@ ADDED is (from original env)
 EMPTY is ()
 arguments are arg1=1 arg2=2'
 
+rm -f go-envdir
+
 [ "${result}" = "${expected}" ] || (echo -e "invalid output: ${result}" && exit 1)
 
-rm -f go-envdir
 echo "PASS"
