@@ -15,6 +15,8 @@ const (
 	memoryLimit uint64 = 30 * mb
 
 	timeLimit = 300 * time.Millisecond
+
+	allocationsLimit = 300_000
 )
 
 // go test -v -count=1 -timeout=30s -tags bench .
@@ -41,11 +43,14 @@ func TestGetDomainStat_Time_And_Memory(t *testing.T) {
 
 	result := testing.Benchmark(bench)
 	mem := result.MemBytes
+	memAllocs := result.MemAllocs
 	t.Logf("time used: %s", result.T)
 	t.Logf("memory used: %dMb", mem/mb)
+	t.Logf("memory allocations: %d", memAllocs)
 
 	require.Less(t, int64(result.T), int64(timeLimit), "the program is too slow")
 	require.Less(t, mem, memoryLimit, "the program is too greedy")
+	require.Less(t, memAllocs, uint64(allocationsLimit), "the program is too messy")
 }
 
 var expectedBizStat = DomainStat{
